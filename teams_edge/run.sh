@@ -28,6 +28,11 @@ export NOTIFY_PREVIEW="$(opt notify_preview)"; export QUIET_HOURS="$(opt quiet_h
 export EXTERNAL_URL="$(opt external_url)"; export LOG_LEVEL="$(opt log_level)"
 export TZ="${TZ:-Europe/Warsaw}"
 export CDP_URL="http://127.0.0.1:9222"
+# WebKitGTK bez GPU rysuje okno logowania brokera na czarno — te flagi wymuszają
+# rendering programowy, inaczej logowanie Microsoft nie pokazuje się i pada w pętlę.
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+export WEBKIT_DISABLE_COMPOSITING_MODE=1
+export LIBGL_ALWAYS_SOFTWARE=1
 
 mkdir -p "$EDGE_PROFILE" /data/keyring
 echo "[teams] start: ekran ${SCREEN_W}x${SCREEN_H}, skala ${SCALE} (okno ${WIN_W}x${WIN_H} CSS), url=${START_URL}"

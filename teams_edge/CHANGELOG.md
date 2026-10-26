@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Wymuszenie programowego renderowania WebKitGTK (WEBKIT_DISABLE_DMABUF_RENDERER i spółka),
+  bo okno logowania Microsoft potrafi na serwerze bez GPU narysować się na czarno.
+
 ## 0.2.2
 
 - Okno logowania Edge ma stały rozmiar ~800 px; przy skali 2 rysowało się jako 1600 px
