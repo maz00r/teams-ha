@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Fałszywy alarm „Teams wylogowany": przekierowanie do logowania tuż po starcie
+  było brane za utratę sesji. Sesja liczy się dopiero po minucie w Teams.
+
 ## 0.1.1
 
 - Pusty `external_url` blokował zapis konfiguracji — pole jest teraz zwykłym tekstem.

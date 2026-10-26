@@ -1,5 +1,5 @@
 name: Teams (przeglądarka na telefon)
-version: "0.1.1"
+version: "0.1.2"
 slug: teams_browser
 description: Microsoft Teams w przeglądarce działającej na serwerze HA, z panelem dopasowanym do telefonu i powiadomieniami push.
 url: https://github.com/maz00r/teams-ha

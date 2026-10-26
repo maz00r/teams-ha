@@ -30,6 +30,7 @@ POLL_SECONDS = 10
 DEDUP_SECONDS = 120
 FALLBACK_GRACE = 25          # tyle czekamy na „prawdziwe" powiadomienie, zanim wyślemy licznik
 LOGOUT_GRACE = 180           # wylogowanie dłuższe niż to -> push
+LOGIN_CONFIRM = 60           # tyle Teams musi działać bez logowania, by uznać sesję za prawdziwą
 
 HOOK_JS = r"""
 (() => {
@@ -304,8 +305,9 @@ class Watcher:
         self.unread = UnreadTracker()
         self.badge = None
         prev = read_status()
-        self.was_logged_in = bool(prev.get("was_logged_in"))
+        self.was_logged_in = bool(prev.get("session_confirmed"))
         self.logged_out_since = None
+        self.logged_in_since = None
         self.logout_pushed = False
         self.away = None
 
@@ -359,13 +361,18 @@ class Watcher:
             log("nikt nie patrzy — tryb tła" if away else "panel otwarty", level="debug")
 
         if logged_in:
-            self.was_logged_in = True
+            # Przy starcie Teams na moment pokazuje swój adres, zanim przekieruje do
+            # logowania — sesję uznajemy dopiero po minucie bez przekierowania.
+            self.logged_in_since = self.logged_in_since or now
+            if now - self.logged_in_since >= LOGIN_CONFIRM:
+                self.was_logged_in = True
             self.logged_out_since = None
             self.logout_pushed = False
             fallback = self.unread.update(count, now)
             if fallback:
                 self.pusher.send("Teams", f"Nieprzeczytane: {fallback}")
         else:
+            self.logged_in_since = None
             self.logged_out_since = self.logged_out_since or now
             if (self.was_logged_in and not self.logout_pushed
                     and now - self.logged_out_since > LOGOUT_GRACE):
@@ -373,7 +380,7 @@ class Watcher:
                 self.pusher.send("Teams wylogowany", "Otwórz panel Teams w HA i zaloguj się ponownie.",
                                  tag="teams-login")
 
-        write_status({"unread": count, "logged_in": logged_in, "was_logged_in": self.was_logged_in,
+        write_status({"unread": count, "logged_in": logged_in, "session_confirmed": self.was_logged_in,
                       "away": away, "updated": int(now)})
         self.pusher.sensor(count, logged_in)
 

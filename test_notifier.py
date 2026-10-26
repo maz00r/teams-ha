@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+import unittest.mock
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "teams_browser"))
@@ -98,6 +99,64 @@ class Unread(unittest.TestCase):
         u.update(1, 1010)
         self.assertIsNone(u.update(0, 1020))
         self.assertIsNone(u.update(0, 1100))
+
+
+class FakeConn:
+    def __init__(self):
+        self.url = ""
+
+    def evaluate(self, expr):
+        if expr.startswith("[document.title"):
+            return ["", self.url]
+        return None
+
+
+class FakePusher:
+    preview = True
+
+    def __init__(self):
+        self.sent = []
+
+    def send(self, title, message, tag="teams"):
+        self.sent.append((title, tag))
+
+    def sensor(self, *a):
+        pass
+
+
+class Logout(unittest.TestCase):
+    def setUp(self):
+        self.patches = [
+            unittest.mock.patch.object(notifier, "viewer_active", return_value=False),
+            unittest.mock.patch.object(notifier, "write_status"),
+            unittest.mock.patch.object(notifier, "read_status", return_value={}),
+        ]
+        for p in self.patches:
+            p.start()
+        self.pusher = FakePusher()
+        self.w = notifier.Watcher(self.pusher)
+        self.conn = FakeConn()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+
+    def test_startup_redirect_is_not_a_logout(self):
+        self.conn.url = "https://teams.microsoft.com/v2/"
+        self.w.tick(self.conn, 1000)
+        self.conn.url = "https://login.microsoftonline.com/common/oauth2"
+        for t in range(1010, 2000, 10):
+            self.w.tick(self.conn, t)
+        self.assertEqual(self.pusher.sent, [])
+
+    def test_real_logout_pushes_once(self):
+        self.conn.url = "https://teams.microsoft.com/v2/"
+        for t in range(1000, 1100, 10):
+            self.w.tick(self.conn, t)
+        self.conn.url = "https://login.microsoftonline.com/common/oauth2"
+        for t in range(1100, 1700, 10):
+            self.w.tick(self.conn, t)
+        self.assertEqual([tag for _, tag in self.pusher.sent], ["teams-login"])
 
 
 class Hook(unittest.TestCase):
