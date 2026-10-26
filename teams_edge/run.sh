@@ -85,7 +85,7 @@ sleep 2
       --remote-allow-origins='*' \
       --force-device-scale-factor="$SCALE" \
       --window-position=0,0 --window-size="${WIN_W},${WIN_H}" \
-      --kiosk --lang=pl --no-first-run --no-default-browser-check \
+      --lang=pl --no-first-run --no-default-browser-check \
       --no-service-autorun --disable-sync \
       "$START_URL" 2>&1 | grep -v -E "dbus|Fontconfig|libva|vaapi|vk_renderer|Display.cpp|ANGLE|GPU stall|^$" || true
     echo "[teams] Edge zakończony — restart za 5s"

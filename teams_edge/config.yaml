@@ -1,5 +1,5 @@
 name: Teams (Edge + rejestracja urządzenia)
-version: "0.2.0"
+version: "0.2.1"
 slug: teams_edge
 description: Teams w Microsoft Edge z brokerem tożsamości (rejestracja urządzenia w Entra ID), panel na telefon i push. Wersja eksperymentalna pod firmowe reguły dostępu warunkowego.
 url: https://github.com/maz00r/teams-ha

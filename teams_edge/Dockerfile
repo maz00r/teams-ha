@@ -25,6 +25,14 @@ RUN echo "=== pliki brokera ===" && dpkg -L microsoft-identity-broker | grep -E 
     echo "=== service ExecStart ===" && grep -rhE "ExecStart" /usr/lib/systemd/*/microsoft-identity-broker* /lib/systemd/*/microsoft-identity-broker* 2>/dev/null || true; \
     echo "=== novnc ===" && ls /usr/share/novnc/core/rfb.js 2>/dev/null || true
 
+# Polityka Edge: wymuś logowanie do przeglądarki (konto w profilu Edge) — to logowanie
+# idzie przez brokera i rejestruje urządzenie w Entra ID (Workplace Join). Logowanie
+# tylko w karcie Teams omija brokera i nie rejestruje. HideFirstRunExperience ucina
+# ekran powitalny, żeby od razu było widać prośbę o konto.
+RUN mkdir -p /etc/opt/edge/policies/managed \
+    && printf '{\n  "BrowserSignin": 2,\n  "HideFirstRunExperience": true,\n  "SyncDisabled": true\n}\n' \
+       > /etc/opt/edge/policies/managed/registration.json
+
 COPY cdp.py notifier.py panel.py panel.html /app/
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
