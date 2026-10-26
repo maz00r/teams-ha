@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Teams</title>
+<style>
+  :root {
+    --bg: #f5f5f7; --bar: #ffffff; --fg: #1f1f24; --muted: #6b6b76;
+    --btn: #ececf1; --btn-active: #d9d9e3; --accent: #5b5fc7; --accent-fg: #fff;
+    --border: #e0e0e6; --bad: #c4314b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111114; --bar: #1c1c21; --fg: #ececf1; --muted: #9a9aa6;
+      --btn: #2a2a31; --btn-active: #3a3a44; --accent: #7f85f5; --accent-fg: #111114;
+      --border: #2e2e36; --bad: #f1707b;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 15px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+  #screen { flex: 1; min-height: 0; position: relative; background: #000; }
+  #screen > div { width: 100%; height: 100%; }
+  #status { position: absolute; top: 8px; right: 8px; z-index: 5; pointer-events: none;
+    padding: 3px 9px; border-radius: 999px; font-size: 12px; background: rgba(0,0,0,.55);
+    color: #fff; opacity: 0; transition: opacity .3s; }
+  #status.show { opacity: 1; }
+  #status.bad { background: var(--bad); }
+  .bar { background: var(--bar); border-top: 1px solid var(--border);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+  .keys { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 6px; }
+  .keys::-webkit-scrollbar { display: none; }
+  button { flex: 0 0 auto; min-width: 44px; height: 38px; padding: 0 10px; border: 0;
+    border-radius: 10px; background: var(--btn); color: var(--fg); font: inherit; font-size: 16px; }
+  button:active { background: var(--btn-active); }
+  button .lbl { font-size: 13px; margin-left: 4px; }
+  form { display: flex; gap: 6px; margin: 0; }
+  textarea { flex: 1; min-width: 0; height: 40px; max-height: 120px; resize: none;
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--bg); color: var(--fg); font: inherit; font-size: 16px; overflow-y: hidden; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .send { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .send:active { filter: brightness(.9); background: var(--accent); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 4px; text-align: center; }
+  .hint:empty { display: none; }
+</style>
+</head>
+<body>
+<div id="screen">
+  <div id="vnc"></div>
+  <div id="status"></div>
+</div>
+<div class="bar">
+  <div class="keys">
+    <button data-nav="home" title="Wróć do Teams">🏠</button>
+    <button data-nav="back" title="Wstecz">◀</button>
+    <button data-scroll="up" title="Przewiń w górę">▲</button>
+    <button data-scroll="down" title="Przewiń w dół">▼</button>
+    <button data-key="Enter" title="Enter">⏎</button>
+    <button data-key="Backspace" title="Usuń znak">⌫</button>
+    <button data-key="Escape" title="Esc">Esc</button>
+    <button data-key="Tab" title="Tab">Tab</button>
+    <button data-nav="reload" title="Odśwież Teams">⟳</button>
+  </div>
+  <form id="compose" autocomplete="off">
+    <textarea id="text" rows="1" placeholder="Pisz tutaj…" enterkeyhint="send"></textarea>
+    <button type="button" id="insert" title="Wpisz bez wysyłania">✎</button>
+    <button type="submit" class="send" title="Wpisz i wyślij (Enter)">Wyślij</button>
+  </form>
+  <div class="hint" id="hint"></div>
+</div>
+
+<script type="module">
+import RFB from "./core/rfb.js";
+
+const statusEl = document.getElementById("status");
+const hint = document.getElementById("hint");
+const text = document.getElementById("text");
+let statusTimer = null;
+
+function showStatus(msg, bad, sticky) {
+  statusEl.textContent = msg;
+  statusEl.classList.toggle("bad", !!bad);
+  statusEl.classList.add("show");
+  clearTimeout(statusTimer);
+  if (!sticky) statusTimer = setTimeout(() => statusEl.classList.remove("show"), 2500);
+}
+
+async function api(path, body) {
+  try {
+    const r = await fetch("api/" + path, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const doc = await r.json().catch(() => ({}));
+    if (!r.ok || !doc.ok) throw new Error(doc.error || ("HTTP " + r.status));
+    return true;
+  } catch (e) {
+    showStatus("Błąd: " + e.message, true);
+    return false;
+  }
+}
+
+// ---- obraz (noVNC) ----
+let rfb = null;
+let retry = 1000;
+function connect() {
+  const dir = location.pathname.replace(/[^/]*$/, "");
+  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + dir + "websockify";
+  rfb = new RFB(document.getElementById("vnc"), url, { shared: true });
+  rfb.scaleViewport = true;     // cały ekran Teams dopasowany do telefonu
+  rfb.resizeSession = false;
+  rfb.clipViewport = false;
+  rfb.focusOnClick = false;     // nie kradnij fokusu polu tekstowemu
+  rfb.showDotCursor = true;
+  rfb.qualityLevel = 6;
+  rfb.compressionLevel = 2;
+  rfb.addEventListener("connect", () => { retry = 1000; showStatus("Połączono"); });
+  rfb.addEventListener("disconnect", () => {
+    showStatus("Rozłączono — łączę ponownie…", true, true);
+    setTimeout(connect, retry);
+    retry = Math.min(retry * 2, 15000);
+  });
+}
+connect();
+
+// Po powrocie do aplikacji (telefon uśpił kartę) wymuś świeże połączenie.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && rfb && rfb._rfbConnectionState !== "connected") {
+    try { rfb.disconnect(); } catch (e) { /* i tak łączymy od nowa */ }
+  }
+});
+
+// ---- przyciski ----
+document.querySelectorAll("[data-key]").forEach(b =>
+  b.addEventListener("click", () => api("key", { key: b.dataset.key })));
+document.querySelectorAll("[data-scroll]").forEach(b =>
+  b.addEventListener("click", () => api("scroll", { dir: b.dataset.scroll })));
+document.querySelectorAll("[data-nav]").forEach(b =>
+  b.addEventListener("click", () => api("nav", { action: b.dataset.nav })));
+
+// ---- pisanie ----
+function autoGrow() {
+  text.style.height = "40px";
+  text.style.height = Math.min(text.scrollHeight + 2, 120) + "px";
+  text.style.overflowY = text.scrollHeight > 118 ? "auto" : "hidden";
+}
+text.addEventListener("input", autoGrow);
+
+async function sendText(enter) {
+  const value = text.value;
+  if (!value) { if (enter) api("key", { key: "Enter" }); return; }
+  if (await api("type", { text: value, enter })) {
+    text.value = "";
+    autoGrow();
+    showStatus(enter ? "Wysłano" : "Wpisano");
+  }
+}
+document.getElementById("compose").addEventListener("submit", e => { e.preventDefault(); sendText(true); });
+document.getElementById("insert").addEventListener("click", () => sendText(false));
+// Enter na klawiaturze = Wyślij; Shift+Enter = nowa linia w polu panelu.
+text.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(true); }
+});
+
+// ---- stan z notifiera (wylogowanie, nieprzeczytane) ----
+async function poll() {
+  try {
+    const r = await fetch("api/status", { cache: "no-store" });
+    const s = await r.json();
+    if (s.logged_in === false) hint.textContent = "Zaloguj się na ekranie powyżej. Najpierw stuknij pole, potem wpisz tekst na dole i ✎.";
+    else hint.textContent = "";
+    document.title = s.unread ? `(${s.unread}) Teams` : "Teams";
+  } catch (e) { /* panel działa i bez statusu */ }
+}
+poll();
+setInterval(poll, 15000);
+
+// ---- „ktoś patrzy" — gdy panel jest w tle, Teams ma wysyłać powiadomienia ----
+function beat() {
+  if (document.visibilityState === "visible") api("heartbeat", {});
+}
+beat();
+setInterval(beat, 20000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") beat();
+  else navigator.sendBeacon("api/heartbeat", new Blob([JSON.stringify({ leaving: true })], { type: "application/json" }));
+});
+</script>
+</body>
+</html>
