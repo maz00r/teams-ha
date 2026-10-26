@@ -13,9 +13,9 @@ opt() { python3 -c "import json;v=json.load(open('$OPT')).get('$1');print('' if 
 
 START_URL="$(opt start_url)"; SCREEN_W="$(opt screen_width)"; SCREEN_H="$(opt screen_height)"; SCALE="$(opt scale)"
 case "$START_URL" in "") START_URL="https://teams.microsoft.com/v2/" ;; esac
-case "$SCREEN_W" in "") SCREEN_W=1000 ;; esac
-case "$SCREEN_H" in "") SCREEN_H=2160 ;; esac
-case "$SCALE" in "") SCALE=2 ;; esac
+case "$SCREEN_W" in "") SCREEN_W=840 ;; esac
+case "$SCREEN_H" in "") SCREEN_H=1800 ;; esac
+case "$SCALE" in "") SCALE=1 ;; esac
 WIN_W="$(python3 -c "print(int($SCREEN_W / $SCALE))")"
 WIN_H="$(python3 -c "print(int($SCREEN_H / $SCALE))")"
 if [ "$WIN_W" -lt 500 ]; then
