@@ -1,0 +1,14 @@
+[Unit]
+Description=Teams panel (Edge + noVNC + notifier) dla telefonu
+# Czekaj na graficzną sesję użytkownika — potrzebny keyring i broker tożsamości.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=exec
+ExecStart=%h/.local/share/teams-panel/teams-panel.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
